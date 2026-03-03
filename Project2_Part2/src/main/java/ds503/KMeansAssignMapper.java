@@ -15,7 +15,7 @@ import java.util.List;
 /**
  * Map-only job:
  * Input: pointId,w,x,y,z
- * Output: pointId,w,x,y,z,clusterId,centerW,centerX,centerY,centerZ
+ * Output: w,x,y,z,clusterId,centerW,centerX,centerY,centerZ
  */
 public class KMeansAssignMapper extends Mapper<LongWritable, Text, Text, Text> {
 
@@ -64,13 +64,13 @@ public class KMeansAssignMapper extends Mapper<LongWritable, Text, Text, Text> {
     protected void map(LongWritable key, Text value, Context context) {
         try {
             String[] p = value.toString().trim().split(",");
-            if (p.length < 5) return;
+            if (p.length < 4) return;
 
-            String pid = p[0];
-            double w = Double.parseDouble(p[1]);
-            double x = Double.parseDouble(p[2]);
-            double y = Double.parseDouble(p[3]);
-            double z = Double.parseDouble(p[4]);
+            // Your dataset is: w,x,y,z
+            double w = Double.parseDouble(p[0]);
+            double x = Double.parseDouble(p[1]);
+            double y = Double.parseDouble(p[2]);
+            double z = Double.parseDouble(p[3]);
 
             Center best = null;
             double bestD = Double.POSITIVE_INFINITY;
@@ -84,9 +84,12 @@ public class KMeansAssignMapper extends Mapper<LongWritable, Text, Text, Text> {
             }
 
             if (best != null) {
-                String out = pid + "," + w + "," + x + "," + y + "," + z + "," +
+                // Output: w,x,y,z,clusterId,centerW,centerX,centerY,centerZ
+                String out = w + "," + x + "," + y + "," + z + "," +
                         best.id + "," + best.w + "," + best.x + "," + best.y + "," + best.z;
-                context.write(new Text(out), new Text(""));
+
+                // Use a non-empty value so every line is visible in part-m output
+                context.write(new Text(out), new Text("1"));
             }
         } catch (Exception ignored) {}
     }

@@ -29,28 +29,55 @@ public class KMeansMapper extends Mapper<LongWritable, Text, Text, Text> {
                 throw new RuntimeException("No centers file in distributed cache.");
             }
 
-            // Centers file format: clusterId,w,x,y,z  (CSV)
-            Path centersPath = new Path(cacheFiles[0].toString());
+            // In local mode, Hadoop creates a local symlink named like the original file (often part-r-00000)
+            // Safest: read the first cache file as a *local file path*.
+            Path localPath = new Path(cacheFiles[0].getPath()); // <-- key change
+
+            List<Center> loaded = new ArrayList<>();
+
             try (BufferedReader br = new BufferedReader(new InputStreamReader(
-                    centersPath.getFileSystem(conf).open(centersPath)
+                    localPath.getFileSystem(conf).open(localPath)
             ))) {
                 String line;
                 while ((line = br.readLine()) != null) {
-                    String[] p = line.trim().split(",");
-                    if (p.length < 5) continue;
-                    centers.add(new Center(
-                            p[0],
-                            Double.parseDouble(p[1]),
-                            Double.parseDouble(p[2]),
-                            Double.parseDouble(p[3]),
-                            Double.parseDouble(p[4])
-                    ));
+                    line = line.trim();
+                    if (line.isEmpty()) continue;
+
+                    String cid;
+                    String[] nums;
+
+                    if (line.contains("\t")) {
+                        // reducer output format: c0\tw,x,y,z
+                        String[] parts = line.split("\\t");
+                        if (parts.length != 2) continue;
+                        cid = parts[0].trim();
+                        nums = parts[1].split(",");
+                    } else {
+                        // seed/init file format: c0,w,x,y,z
+                        String[] parts = line.split(",");
+                        if (parts.length < 5) continue;
+                        cid = parts[0].trim();
+                        nums = new String[]{parts[1], parts[2], parts[3], parts[4]};
+                    }
+
+                    if (nums.length < 4) continue;
+
+                    double w = Double.parseDouble(nums[0]);
+                    double x = Double.parseDouble(nums[1]);
+                    double y = Double.parseDouble(nums[2]);
+                    double z = Double.parseDouble(nums[3]);
+
+                    loaded.add(new Center(cid, w, x, y, z));
                 }
             }
 
-            if (centers.isEmpty()) {
-                throw new RuntimeException("Centers file loaded but had 0 centers.");
+            if (loaded.isEmpty()) {
+                throw new RuntimeException("Centers file loaded but had 0 centers. cache=" + cacheFiles[0]);
             }
+
+            centers.clear();
+            centers.addAll(loaded);
+
         } catch (Exception e) {
             throw new RuntimeException("Failed to load centers", e);
         }

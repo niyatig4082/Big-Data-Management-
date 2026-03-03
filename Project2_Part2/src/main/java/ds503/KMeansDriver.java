@@ -35,10 +35,6 @@ public class KMeansDriver {
             System.exit(1);
         }
 
-        for (int i = 0; i < args.length; i++) {
-            System.out.println("args[" + i + "]=" + args[i]);
-        }
-
         int off = 1;  // because args[0] is the main class name in this environment
 
         String pointsPath = args[off + 0];
@@ -204,24 +200,41 @@ public class KMeansDriver {
 
     private static Map<String, Point4D> readCenters(FileSystem fs, Path centersFile) throws IOException {
         Map<String, Point4D> map = new HashMap<>();
+
         try (BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(centersFile)))) {
             String line;
             while ((line = br.readLine()) != null) {
-                // Output format from reducer: "c0\tw,x,y,z"
                 line = line.trim();
                 if (line.isEmpty()) continue;
-                String[] parts = line.split("\\t");
-                if (parts.length != 2) continue;
-                String cid = parts[0];
-                String[] nums = parts[1].split(",");
+
+                String cid;
+                String[] nums;
+
+                if (line.contains("\t")) {
+                    // reducer output: "c0\tw,x,y,z"
+                    String[] parts = line.split("\\t");
+                    if (parts.length != 2) continue;
+                    cid = parts[0].trim();
+                    nums = parts[1].split(",");
+                } else {
+                    // seed/init file: "c0,w,x,y,z"
+                    String[] parts = line.split(",");
+                    if (parts.length < 5) continue;
+                    cid = parts[0].trim();
+                    nums = new String[] { parts[1], parts[2], parts[3], parts[4] };
+                }
+
                 if (nums.length < 4) continue;
+
                 double w = Double.parseDouble(nums[0]);
                 double x = Double.parseDouble(nums[1]);
                 double y = Double.parseDouble(nums[2]);
                 double z = Double.parseDouble(nums[3]);
+
                 map.put(cid, new Point4D(w, x, y, z));
             }
         }
+
         return map;
     }
 
